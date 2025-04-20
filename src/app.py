@@ -1,36 +1,55 @@
-# app.py
+# src/app.py
 import json
 import os
 import sys
 from urllib.parse import urlparse
-import re # Import regex for filename sanitization
+import re
+
+# --- Setup Project Path ---
+# Get the directory containing the 'src' directory (project root)
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Add the project root to the Python path to find sibling modules/packages
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+# --------------------------
+
+# --- Imports relative to project root (now that it's in sys.path) ---
+try:
+    # Import using the new path structure (src.run_url_finder)
+    from src.run_url_finder import run_spider
+    from src.utils.WebpageExtractor import WebpageExtractor
+    from src.utils.FileSaver import write_to_markdown
+except ImportError as e:
+    print(f"Error: Could not import required modules: {e}")
+    print("Ensure all modules exist in the 'src' directory and its subdirectories.")
+    print(f"Project Root added to sys.path: {project_root}")
+    sys.exit(1)
+# ---------------------------------------------------------------------
 
 # --- Configuration ---
 START_URL = "https://browser-use.com/"
-URL_LIST_DIR = "url_lists" # Directory to store the URL list files
+# Define directories relative to the project root
+URL_LIST_DIR_NAME = "url_lists"
+URL_LIST_DIR_ABS = os.path.join(project_root, URL_LIST_DIR_NAME) # Absolute path
 # --------------------
 
 # --- Helper Function to Sanitize Filenames ---
 def sanitize_filename(name):
     """Removes potentially problematic characters for filenames."""
-    # Remove scheme if present (like http://)
     name = re.sub(r'^https?:\/\/', '', name)
-    # Replace dots and slashes with underscores
     name = name.replace('.', '_').replace('/', '_')
-    # Remove characters not suitable for filenames (allow letters, numbers, underscore, hyphen)
     name = re.sub(r'[^\w\-]+', '', name)
-    # Ensure it's not empty
     return name or "default"
 # ---------------------------------------------
 
 # --- Derive Filename and Path ---
 try:
     parsed_start_uri = urlparse(START_URL)
-    # Use netloc (domain) for filename base, sanitized
     domain_part = parsed_start_uri.netloc if parsed_start_uri.netloc else "unknown_url"
     sanitized_domain = sanitize_filename(domain_part)
     url_filename = f"{sanitized_domain}_urls.jsonl"
-    full_url_output_path = os.path.join(URL_LIST_DIR, url_filename)
+    # Construct the absolute path for the URL list file
+    full_url_output_path = os.path.join(URL_LIST_DIR_ABS, url_filename)
 except Exception as e:
     print(f"Error parsing START_URL '{START_URL}' to generate filename: {e}")
     sys.exit(1)
@@ -39,14 +58,7 @@ except Exception as e:
 # --- Step 1: Run the URL Finder ---
 print("--- Running URL Finder ---")
 try:
-    from run_url_finder import run_spider
-except ImportError:
-    print("Error: Could not import 'run_spider' from 'run_url_finder.py'.")
-    print("Ensure 'run_url_finder.py' is in the same directory.")
-    sys.exit(1)
-
-try:
-    # Pass the full path to the run_spider function
+    # Pass the absolute path to the run_spider function
     run_spider(start_url=START_URL, output_file_path=full_url_output_path) # Domain auto-derived
     print(f"--- URL Finder finished. URLs should be in {full_url_output_path} ---")
 except Exception as e:
@@ -56,24 +68,12 @@ except Exception as e:
 # --- Step 2: Extract Content from Found URLs ---
 print(f"\n--- Starting Content Extraction from {full_url_output_path} ---")
 
-# Import necessary components for extraction
-try:
-    project_dir = os.path.dirname(os.path.abspath(__file__))
-    if project_dir not in sys.path:
-         sys.path.insert(0, project_dir)
-    from utils.WebpageExtractor import WebpageExtractor
-    from utils.FileSaver import write_to_markdown
-except ImportError as e:
-     print(f"Error: Could not import required modules from 'utils': {e}")
-     print("Ensure 'utils' directory with necessary files exists.")
-     sys.exit(1)
-
-# Check if the URL file exists *at the expected full path*
+# Check if the URL file exists *at the expected absolute path*
 if not os.path.exists(full_url_output_path):
-    print(f"Error: Output file '{full_url_output_path}' not found. URL Finder might have failed or saved elsewhere.")
+    print(f"Error: Output file '{full_url_output_path}' not found.")
     sys.exit(1)
 
-# --- Read URLs from the file at the full path ---
+# --- Read URLs from the file at the absolute path ---
 target_urls: list = []
 try:
     with open(full_url_output_path, 'r', encoding='utf-8') as f:
@@ -92,7 +92,7 @@ except Exception as e:
 # --- Process the extracted URLs (logic remains the same) ---
 if target_urls:
     print(f"Processing {len(target_urls)} URLs from {full_url_output_path}...")
-    extractor = WebpageExtractor()
+    extractor = WebpageExtractor() # Instantiate from src.utils
 
     for i, link in enumerate(target_urls):
         print(f"Processing: {link}")
@@ -117,6 +117,8 @@ if target_urls:
             domain_name = "parsing_error_domain"
             output_filename_base = f"error_site_{i+1}.md"
 
+        # write_to_markdown is imported from src.utils
+        # It needs to correctly place files in the project root's output_folder
         write_to_markdown(result, output_filename_base, domain=domain_name)
 
     print("--- Content Extraction finished. ---")

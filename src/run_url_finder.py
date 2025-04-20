@@ -1,35 +1,43 @@
-# run_url_finder.py
+# src/run_url_finder.py
 import argparse
 import sys
 from urllib.parse import urlparse
 import os
 
-# Define the directory for URL list files
-URL_LIST_DIR = "url_lists"
+# --- Setup Project Path ---
+# Get the directory containing the 'src' directory (project root)
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Add the project root to the Python path
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+# --------------------------
 
-# Add the project directory to the Python path to find 'find_urls' module
-project_dir = os.path.dirname(os.path.abspath(__file__))
-if project_dir not in sys.path:
-    sys.path.insert(0, project_dir)
+# --- Constants ---
+# Define directory name relative to project root
+URL_LIST_DIR_NAME = "url_lists"
+# --- End Constants ---
 
+
+# --- Imports relative to project root ---
 try:
-    from find_urls import UrlFinderSpider
+    # Import find_urls now relative to src
+    from src.find_urls import UrlFinderSpider
 except ImportError:
-    print("Error: Could not import UrlFinderSpider from find_urls.py")
+    print("Error: Could not import UrlFinderSpider from src.find_urls.py")
     sys.exit(1)
 
 from scrapy.crawler import CrawlerProcess
 from scrapy.settings import Settings
-from scrapy.utils.project import get_project_settings # Although not used directly, good practice
+# --------------------------------------
 
-def run_spider(start_url, output_file_path, domain=None): # Takes full path now
+
+def run_spider(start_url, output_file_path, domain=None): # Takes absolute path
     """Configures and runs the UrlFinderSpider."""
 
-    # --- Ensure output directory exists ---
+    # Ensure output directory exists (using the absolute path provided)
     output_dir = os.path.dirname(output_file_path)
-    if output_dir: # Only create if path includes a directory
+    if output_dir:
         os.makedirs(output_dir, exist_ok=True)
-    # ------------------------------------
 
     # --- Configuration ---
     if domain is None:
@@ -44,6 +52,7 @@ def run_spider(start_url, output_file_path, domain=None): # Takes full path now
              sys.exit(1)
 
     settings = Settings()
+    # Standard Scrapy settings...
     settings['USER_AGENT'] = 'MyUrlFinderBot/1.0 (+http://mydomain.com/botinfo)'
     settings['ROBOTSTXT_OBEY'] = True
     settings['LOG_LEVEL'] = 'INFO'
@@ -54,7 +63,7 @@ def run_spider(start_url, output_file_path, domain=None): # Takes full path now
     settings['CONCURRENT_REQUESTS'] = 8
     settings['CONCURRENT_REQUESTS_PER_DOMAIN'] = 4
     settings['FEEDS'] = {
-        output_file_path: { # Use the full path here
+        output_file_path: { # Use the absolute path here
             'format': 'jsonlines',
             'encoding': 'utf8',
             'store_empty': False,
@@ -67,14 +76,18 @@ def run_spider(start_url, output_file_path, domain=None): # Takes full path now
     # --- Run the Crawler ---
     process = CrawlerProcess(settings)
     print(f"Starting crawl for domain '{domain}' at '{start_url}'...")
-    print(f"Output will be saved to '{output_file_path}'") # Show the full path
+    print(f"Output will be saved to '{output_file_path}'") # Show the absolute path
+    # Pass the spider class directly (imported from src.find_urls)
     process.crawl(UrlFinderSpider, start_url=start_url, domain=domain)
     process.start() # Blocks until finished
     print("Crawling finished.")
 
+# --- Main execution block (if run directly) ---
 if __name__ == "__main__":
+    # This part is mainly for standalone testing of this script,
+    # app.py is the intended entry point.
     parser = argparse.ArgumentParser(
-        description=f"Find all unique URLs within a domain using Scrapy. Saves output to '{URL_LIST_DIR}/' directory.",
+        description=f"Find URLs. Saves output to '{URL_LIST_DIR_NAME}/' relative to project root.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser.add_argument(
@@ -84,18 +97,19 @@ if __name__ == "__main__":
     parser.add_argument(
         "-o", "--output",
         default="found_urls.jsonl",
-        # Help text clarifies it's just the filename now
-        help=f"Filename for the output file (will be placed in '{URL_LIST_DIR}/')."
+        help=f"Filename for the output file (will be placed in '{URL_LIST_DIR_NAME}/')."
     )
     parser.add_argument(
         "-d", "--domain",
         default=None,
-        help="Optional: The domain to restrict the crawl to (e.g., 'example.com'). If not provided, it will be derived from the start_url."
+        help="Optional: Domain restriction (e.g., 'example.com'). Auto-derived if None."
     )
 
     args = parser.parse_args()
 
-    # Construct the full path when run standalone
-    full_output_path = os.path.join(URL_LIST_DIR, args.output)
+    # Construct the absolute path when run standalone
+    # Assumes run from project root or src, calculates root path correctly
+    abs_url_list_dir = os.path.join(project_root, URL_LIST_DIR_NAME)
+    full_output_path = os.path.join(abs_url_list_dir, args.output)
 
     run_spider(args.start_url, full_output_path, args.domain)

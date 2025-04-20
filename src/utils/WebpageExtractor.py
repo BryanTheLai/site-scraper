@@ -69,33 +69,63 @@ class WebpageExtractor:
 
         return {'url': url, 'title': title, 'content': extracted_content}
 
-# --- Example Usage ---
+# src/utils/WebpageExtractor.py
+# ... (class definition remains the same) ...
+
+# --- Example Usage (if run directly) ---
 if __name__ == "__main__":
     import json
     import os
+    import sys
     from urllib.parse import urlparse
-    from FileSaver import write_to_markdown
 
-    INPUT_JSONL_FILE = "aider_urls.jsonl"
-    target_urls: list = []
+    # --- Setup Project Path ---
+    # Get the directory containing the 'src' directory (project root)
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    # Add the project root to the Python path
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)
+    # --------------------------
+
+    # --- Imports relative to project root ---
     try:
-        with open(INPUT_JSONL_FILE, 'r', encoding='utf-8') as f:
+        # Import FileSaver using its new path
+        from src.utils.FileSaver import write_to_markdown
+    except ImportError:
+        print("Error: Could not import write_to_markdown from src.utils.FileSaver")
+        sys.exit(1)
+    # --------------------------------------
+
+    # Define directories relative to project root
+    URL_LIST_DIR_NAME = "url_lists"
+    # ---
+
+    # Construct absolute path to input file
+    INPUT_JSONL_FILENAME = "aider_urls.jsonl" # Example filename
+    input_jsonl_path = os.path.join(project_root, URL_LIST_DIR_NAME, INPUT_JSONL_FILENAME)
+
+    target_urls: list = []
+    if not os.path.exists(input_jsonl_path):
+        print(f"Error: Input file not found: {input_jsonl_path}")
+        sys.exit(1)
+
+    try:
+        with open(input_jsonl_path, 'r', encoding='utf-8') as f:
             for line in f:
                 try:
                     data = json.loads(line)
                     url = data["url"]
                     target_urls.append(url)
                 except (json.JSONDecodeError, KeyError) as e:
-                    print(f"Skipping invalid line in {INPUT_JSONL_FILE}: {line.strip()} - Error: {e}")
+                    print(f"Skipping invalid line in {input_jsonl_path}: {line.strip()} - Error: {e}")
                     continue
-    except FileNotFoundError:
-        print(f"Error: Input file not found: {INPUT_JSONL_FILE}")
-        import sys
+    except Exception as e:
+        print(f"Error reading {input_jsonl_path}: {e}")
         sys.exit(1)
 
-    # --- Process URLs ---
     if target_urls:
-        print(f"Processing {len(target_urls)} URLs from {INPUT_JSONL_FILE}...")
+        print(f"Processing {len(target_urls)} URLs from {input_jsonl_path}...")
+        # Instantiate the class itself
         extractor = WebpageExtractor()
 
         for i, link in enumerate(target_urls):
@@ -119,7 +149,10 @@ if __name__ == "__main__":
                 print(f"Warning: Error parsing URL '{link}' for filename generation: {e}")
                 domain_name = "parsing_error_domain"
                 output_filename_base = f"error_site_{i+1}.md"
+
+            # write_to_markdown is imported from src.utils.FileSaver
+            # It will handle placing files correctly relative to project root
             write_to_markdown(result, output_filename_base, domain=domain_name)
         print("Finished processing.")
     else:
-        print(f"No valid URLs found or loaded from {INPUT_JSONL_FILE}.")
+        print(f"No valid URLs found or loaded from {input_jsonl_path}.")
