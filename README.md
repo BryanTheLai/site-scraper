@@ -87,18 +87,3 @@ Example Inc. is a hypothetical company dedicated to showcasing best practices in
 ├── requirements.txt         # Pinned dependencies
 └── README.md                # You are reading it
 ```
-
----
-
-## 🤝 Contributing
-
-1. **Fork** the repo and create a branch (`feature/awesome`).
-2. **Implement** your feature or fix using type hints and PEP8.
-3. **Test**: add or update tests for new behavior.
-4. **PR**: Submit a clear PR with description and screenshots if applicable.
-
----
-
-<div align="center">
-**Made with ❤️ by a Senior Eng**
-</div>
